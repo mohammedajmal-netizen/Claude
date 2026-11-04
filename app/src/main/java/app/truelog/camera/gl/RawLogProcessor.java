@@ -186,7 +186,7 @@ public final class RawLogProcessor {
         GLES20.glActiveTexture(GLES20.GL_TEXTURE1);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, shadeTexCurrent());
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-        GLES31.glBindImageTexture(0, linTex, 0, false, 0, GLES30.GL_WRITE_ONLY, GLES30.GL_R32F);
+        GLES31.glBindImageTexture(0, linTex, 0, false, 0, GLES31.GL_WRITE_ONLY, GLES30.GL_R32F);
         dispatch(cfg.cropWidth, cfg.cropHeight, 64);
         GLES31.glMemoryBarrier(GLES31.GL_TEXTURE_FETCH_BARRIER_BIT | GLES31.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -196,7 +196,7 @@ public final class RawLogProcessor {
         GLES20.glUniform2i(loc(demosaicProg, "uRedPos"), red[0], red[1]);
         GLES20.glUniformMatrix3fv(loc(demosaicProg, "uCamToGamut"), 1, true, p.camToGamut, 0);
         GLES20.glUniform1f(loc(demosaicProg, "uExposure"), p.exposure);
-        GLES31.glBindImageTexture(0, logTex, 0, false, 0, GLES30.GL_WRITE_ONLY, GLES30.GL_RGBA16F);
+        GLES31.glBindImageTexture(0, logTex, 0, false, 0, GLES31.GL_WRITE_ONLY, GLES30.GL_RGBA16F);
         dispatch(cfg.cropWidth, cfg.cropHeight, 64);
         GLES31.glMemoryBarrier(GLES31.GL_TEXTURE_FETCH_BARRIER_BIT);
         check("process");
