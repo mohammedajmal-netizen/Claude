@@ -75,18 +75,18 @@ final class AvRecorder {
     }
 
     /**
-     * Largest 16:9 HEVC size at or below the request that an encoder can really deliver.
+     * Largest 16:9 size at or below the request that an encoder for this codec can deliver.
      * Returns {width, height, maxBitrate}, or null when nothing fits.
      */
-    static int[] fitHevc(int height, int fps, boolean tenBit) {
+    static int[] fitVideo(String mime, int height, int fps, boolean tenBit) {
         for (int h : new int[] {height, 2160, 1080, 720, 480}) {
             if (h > height) continue;
-            int w = h * 16 / 9;
+            int w = (h * 16 / 9 + 1) & ~1;
             for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
                 if (!info.isEncoder()) continue;
                 MediaCodecInfo.CodecCapabilities caps;
                 try {
-                    caps = info.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC);
+                    caps = info.getCapabilitiesForType(mime);
                 } catch (IllegalArgumentException e) {
                     continue;
                 }
@@ -105,7 +105,8 @@ final class AvRecorder {
 
     static final class Params {
         int width, height, fps, bitrate;
-        boolean tenBit;           // HEVC Main10 when true, otherwise 8-bit HEVC
+        String mime = MediaFormat.MIMETYPE_VIDEO_HEVC;
+        boolean tenBit;           // HEVC Main10 when true, otherwise 8-bit
         boolean hlg;              // tag as HLG for the standard video mode
         boolean log;              // tag for S-Log3 delivery
         boolean p010Input;        // false means Surface input
@@ -142,7 +143,7 @@ final class AvRecorder {
         muxer = new MediaMuxer(fd, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
         muxer.setOrientationHint(p.orientationHint);
 
-        MediaFormat f = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, p.width, p.height);
+        MediaFormat f = MediaFormat.createVideoFormat(p.mime, p.width, p.height);
         f.setInteger(MediaFormat.KEY_BIT_RATE, p.bitrate);
         f.setInteger(MediaFormat.KEY_FRAME_RATE, p.fps);
         f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
@@ -162,7 +163,7 @@ final class AvRecorder {
             f.setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_HLG);
         }
         video = p.encoderName != null ? MediaCodec.createByCodecName(p.encoderName)
-                : MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC);
+                : MediaCodec.createEncoderByType(p.mime);
         video.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
         if (!p.p010Input) inputSurface = video.createInputSurface();
     }

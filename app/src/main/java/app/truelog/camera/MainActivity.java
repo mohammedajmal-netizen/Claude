@@ -642,6 +642,11 @@ public class MainActivity extends Activity implements CameraController.Listener 
             items.add("Bitrate: " + settings.videoMbps + " Mb/s");
             actions.add(() -> choose("Bitrate", new String[] {"30 Mb/s", "50 Mb/s", "80 Mb/s", "120 Mb/s"}, i ->
                     settings.videoMbps = new int[] {30, 50, 80, 120}[i]));
+            items.add("Codec: " + (settings.h264 ? "H.264" : "HEVC"));
+            actions.add(() -> {
+                settings.h264 = !settings.h264;
+                requestOpen();
+            });
             items.add("HLG 10-bit: " + (settings.hlg ? "on" : "off"));
             actions.add(() -> {
                 if (!CameraController.hlgSupported(lens)) {

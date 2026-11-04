@@ -47,7 +47,13 @@ tap Shutter; sleep 6
 [ "$(saved "Clip saved")" -gt 0 ] && pass "video saved" || fail "video was not saved"
 alive "VIDEO mode records and stops"
 
-tap LOG; sleep 8
+tap LOG
+# Software graphics are far slower than a phone, so give the first frames time to arrive.
+for i in $(seq 1 30); do
+  sleep 3
+  adb logcat -d | grep -q "TrueLog.*log frames=" && break
+done
+sleep 10
 adb exec-out screencap -p > emulator-log.png || true
 alive "LOG mode opens without crashing"
 frames=$(adb logcat -d | grep "TrueLog.*log frames=" | tail -1)
@@ -62,5 +68,7 @@ alive "LOG record tap does not crash"
 adb logcat -d > emulator-logcat.txt
 echo "=== TrueLog log ==="
 grep -E " TrueLog *:" emulator-logcat.txt | sed -E 's/^.*TrueLog *: //' | grep -v -E "^(  |LENS|HEVC|Google|sdk_|$)" | tail -30
+echo "=== camera and GL errors ==="
+grep -E " [EW] (Camera|EmulatedCamera|Adreno|EGL|libEGL|OpenGLRenderer|ImageReader|BufferQueue|TrueLog|GL2)" emulator-logcat.txt | tail -25
 if grep -E "FATAL EXCEPTION" emulator-logcat.txt; then fail "app crashed"; fi
 exit $FAIL

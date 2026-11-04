@@ -23,6 +23,7 @@ final class Settings {
     // Standard video
     volatile int videoHeight = 2160, videoFps = 30, videoMbps = 80;
     volatile boolean hlg;
+    volatile boolean h264;
     volatile boolean stabilise = true;
 
     // Log video

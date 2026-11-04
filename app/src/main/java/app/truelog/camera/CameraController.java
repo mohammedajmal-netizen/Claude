@@ -24,6 +24,7 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ExifInterface;
 import android.media.Image;
 import android.media.ImageReader;
+import android.media.MediaFormat;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -436,7 +437,8 @@ final class CameraController implements LogEngine.Listener {
                     activePlan.outW, activePlan.outH, settings.logFps, settings.logMbps);
         }
         if (m == Mode.VIDEO) {
-            return String.format(Locale.US, "%s  %dp%d  %d Mb/s", settings.hlg ? "HLG 10-bit" : "8-bit",
+            return String.format(Locale.US, "%s  %dp%d  %d Mb/s",
+                    settings.hlg ? "HLG 10-bit" : settings.h264 ? "H.264" : "HEVC",
                     settings.videoHeight, settings.videoFps, settings.videoMbps);
         }
         return m == Mode.PRO ? "Pro" + (rawReader != null ? "  JPEG + DNG" : "  JPEG") : "Photo";
@@ -745,9 +747,16 @@ final class CameraController implements LogEngine.Listener {
 
     private void startVideoRecording() throws IOException, CameraAccessException {
         boolean hlg = settings.hlg && hlgSupported();
-        int[] fit = AvRecorder.fitHevc(settings.videoHeight, settings.videoFps, hlg);
+        // HLG is 10-bit and so needs HEVC. Otherwise fall back to the other codec if one is missing.
+        String mime = settings.h264 && !hlg ? MediaFormat.MIMETYPE_VIDEO_AVC : MediaFormat.MIMETYPE_VIDEO_HEVC;
+        int[] fit = AvRecorder.fitVideo(mime, settings.videoHeight, settings.videoFps, hlg);
+        if (fit == null && !hlg) {
+            mime = mime.equals(MediaFormat.MIMETYPE_VIDEO_AVC)
+                    ? MediaFormat.MIMETYPE_VIDEO_HEVC : MediaFormat.MIMETYPE_VIDEO_AVC;
+            fit = AvRecorder.fitVideo(mime, settings.videoHeight, settings.videoFps, false);
+        }
         if (fit == null) {
-            throw new IllegalStateException("no HEVC encoder for " + settings.videoFps + " fps"
+            throw new IllegalStateException("no encoder for " + settings.videoFps + " fps"
                     + (hlg ? " at 10-bit" : ""));
         }
         if (fit[1] != settings.videoHeight) {
@@ -755,6 +764,7 @@ final class CameraController implements LogEngine.Listener {
         }
         pendingVideo = MediaSaver.beginVideo(context, "TL_" + MediaSaver.stamp() + ".mp4");
         AvRecorder.Params p = new AvRecorder.Params();
+        p.mime = mime;
         p.width = fit[0];
         p.height = fit[1];
         p.fps = settings.videoFps;

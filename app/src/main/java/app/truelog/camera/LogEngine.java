@@ -10,6 +10,7 @@ import android.opengl.EGLSurface;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
+import android.util.Log;
 import android.util.Rational;
 import android.view.Surface;
 
@@ -57,6 +58,8 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
         int fps;
     }
 
+    private static final String TAG = "TrueLog";
+
     private final Settings settings;
     private final Listener listener;
     private final HandlerThread thread = new HandlerThread("log-gl");
@@ -76,6 +79,7 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
     private double appliedHeadroom = -1;
     private boolean wbLocked;
     private int shadingAge;
+    private long imagesSeen;
 
     private AvRecorder recorder;
     private long frames, dropped, lastTs;
@@ -105,6 +109,8 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
                 double[] m = ColorMath.mul(ColorMath.invert(ColorMath.rec709ToXyzD65()), ColorMath.sGamut3CineToXyzD65());
                 view.gamutToRec709 = toFloat(m);
                 view.rotate180 = s.rotate180;
+                Log.i(TAG, "log engine ready, raw " + s.config.rawWidth + "x" + s.config.rawHeight
+                        + " out " + s.config.outWidth + "x" + s.config.outHeight);
             } catch (RuntimeException e) {
                 listener.onLogError("Could not start Log processing: " + e.getMessage());
             }
@@ -150,6 +156,7 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
         if (img == null) return;
         try {
             FrameMeta m = meta;
+            if (imagesSeen++ == 0) Log.i(TAG, "first RAW image, proc " + (proc != null) + " meta " + (m != null));
             if (proc != null && m != null) processFrame(img, m);
         } catch (RuntimeException e) {
             listener.onLogError("Frame processing failed: " + e.getMessage());
@@ -201,7 +208,9 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
         proc.drawPreview(egl.width(previewSurface), egl.height(previewSurface), view);
         egl.swap(previewSurface);
 
-        frames++;
+        if (frames++ == 0) {
+            Log.i(TAG, "first Log frame took " + (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000 + " ms");
+        }
         float ms = (SystemClock.elapsedRealtimeNanos() - started) / 1e6f;
         avgMs = avgMs == 0 ? ms : avgMs * 0.95f + ms * 0.05f;
         long now = SystemClock.elapsedRealtime();
