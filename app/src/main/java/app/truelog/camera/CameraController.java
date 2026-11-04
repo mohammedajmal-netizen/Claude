@@ -83,6 +83,7 @@ final class CameraController implements LogEngine.Listener {
     private ImageReader jpegReader, rawReader, logReader;
     private LogEngine engine;
     private ColorMath.SensorColor sensorColor;
+    private LogPlan activePlan;
 
     private AvRecorder recorder;
     private MediaSaver.PendingVideo pendingVideo;
@@ -135,19 +136,26 @@ final class CameraController implements LogEngine.Listener {
         }
         long budget = 1_000_000_000L / fps;
         long fastest = Long.MAX_VALUE;
-        Size pick = null;
+        Size covering = null, widest = null;
         for (Size s : sizes) {
             long dur = map.getOutputMinFrameDuration(ImageFormat.RAW_SENSOR, s);
-            if (s.getWidth() >= outW && s.getHeight() >= outH) {
-                fastest = Math.min(fastest, dur);
-                if (dur <= budget * 1.02 && (pick == null || s.getWidth() < pick.getWidth())) pick = s;
+            fastest = Math.min(fastest, dur);
+            if (dur > budget * 1.02) continue;
+            if (s.getWidth() >= outW && s.getHeight() >= outH
+                    && (covering == null || s.getWidth() < covering.getWidth())) {
+                covering = s;
             }
+            if (widest == null || s.getWidth() > widest.getWidth()) widest = s;
         }
+        Size pick = covering != null ? covering : widest;
         if (pick == null) {
-            plan.problem = fastest == Long.MAX_VALUE
-                    ? "RAW on this lens is too small for " + outH + "p"
-                    : String.format(Locale.US, "RAW tops out at %.0f fps at %dp on this lens", 1e9 / fastest, outH);
+            plan.problem = String.format(Locale.US, "RAW tops out at %.0f fps on this lens", 1e9 / fastest);
             return plan;
+        }
+        if (covering == null) {
+            // Lower resolution lenses, such as 10MP telephotos, record at their full width.
+            outW = pick.getWidth() & ~15;
+            outH = Math.min(outW * 9 / 16, pick.getHeight()) & ~15;
         }
         plan.raw = pick;
         plan.minFrameNs = map.getOutputMinFrameDuration(ImageFormat.RAW_SENSOR, pick);
@@ -352,11 +360,9 @@ final class CameraController implements LogEngine.Listener {
             listener.onCameraError(plan.problem);
             return false;
         }
+        activePlan = plan;
+        // A missing encoder only blocks recording, so the Log picture can still be monitored.
         AvRecorder.EncoderChoice enc = AvRecorder.chooseTenBit(plan.outW, plan.outH, settings.logFps);
-        if (enc == null) {
-            listener.onCameraError("No 10-bit HEVC encoder for " + plan.outH + "p" + settings.logFps);
-            return false;
-        }
         Integer cfa = chars.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT);
         if (cfa == null || cfa > CameraMetadata.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_BGGR) {
             listener.onCameraError("This lens has a sensor layout the Log engine cannot read");
@@ -426,8 +432,8 @@ final class CameraController implements LogEngine.Listener {
     private String summary() {
         Mode m = settings.mode;
         if (m == Mode.LOG) {
-            return String.format(Locale.US, "S-Log3 / S-Gamut3.Cine  %dp%d  %d Mb/s",
-                    settings.logHeight, settings.logFps, settings.logMbps);
+            return String.format(Locale.US, "S-Log3 / S-Gamut3.Cine  %dx%d  %d fps  %d Mb/s",
+                    activePlan.outW, activePlan.outH, settings.logFps, settings.logMbps);
         }
         if (m == Mode.VIDEO) {
             return String.format(Locale.US, "%s  %dp%d  %d Mb/s", settings.hlg ? "HLG 10-bit" : "8-bit",
@@ -709,6 +715,10 @@ final class CameraController implements LogEngine.Listener {
     private void startLogRecording() throws IOException {
         LogPlan plan = planLog(lens, settings.logHeight, settings.logFps);
         AvRecorder.EncoderChoice enc = AvRecorder.chooseTenBit(plan.outW, plan.outH, settings.logFps);
+        if (enc == null) {
+            throw new IllegalStateException("this phone has no 10-bit HEVC encoder for "
+                    + plan.outW + "x" + plan.outH + " at " + settings.logFps + " fps");
+        }
         pendingVideo = MediaSaver.beginVideo(context, "TL_" + MediaSaver.stamp() + "_SLog3.mp4");
 
         AvRecorder.Params p = new AvRecorder.Params();
@@ -734,21 +744,32 @@ final class CameraController implements LogEngine.Listener {
     }
 
     private void startVideoRecording() throws IOException, CameraAccessException {
+        boolean hlg = settings.hlg && hlgSupported();
+        int[] fit = AvRecorder.fitHevc(settings.videoHeight, settings.videoFps, hlg);
+        if (fit == null) {
+            throw new IllegalStateException("no HEVC encoder for " + settings.videoFps + " fps"
+                    + (hlg ? " at 10-bit" : ""));
+        }
+        if (fit[1] != settings.videoHeight) {
+            listener.onNotice(settings.videoHeight + "p is not available, recording " + fit[1] + "p");
+        }
         pendingVideo = MediaSaver.beginVideo(context, "TL_" + MediaSaver.stamp() + ".mp4");
         AvRecorder.Params p = new AvRecorder.Params();
-        p.height = settings.videoHeight;
-        p.width = p.height * 16 / 9;
+        p.width = fit[0];
+        p.height = fit[1];
         p.fps = settings.videoFps;
-        p.bitrate = settings.videoMbps * 1_000_000;
-        p.hlg = settings.hlg && hlgSupported();
-        p.tenBit = p.hlg;
+        p.bitrate = Math.min(settings.videoMbps * 1_000_000, fit[2]);
+        p.hlg = hlg;
+        p.tenBit = hlg;
         p.audio = true;
         p.orientationHint = imageOrientation();
 
+        // The encoder is built first, so a refusal leaves the live preview untouched.
+        AvRecorder r = new AvRecorder(p, pendingVideo.fd.getFileDescriptor());
+        r.setClockOffsetNs(clockOffsetNs());
         session.close();
         session = null;
-        recorder = new AvRecorder(p, pendingVideo.fd.getFileDescriptor());
-        recorder.setClockOffsetNs(clockOffsetNs());
+        recorder = r;
         configureSession(generation);
     }
 

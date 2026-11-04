@@ -74,6 +74,35 @@ final class AvRecorder {
         return best;
     }
 
+    /**
+     * Largest 16:9 HEVC size at or below the request that an encoder can really deliver.
+     * Returns {width, height, maxBitrate}, or null when nothing fits.
+     */
+    static int[] fitHevc(int height, int fps, boolean tenBit) {
+        for (int h : new int[] {height, 2160, 1080, 720, 480}) {
+            if (h > height) continue;
+            int w = h * 16 / 9;
+            for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
+                if (!info.isEncoder()) continue;
+                MediaCodecInfo.CodecCapabilities caps;
+                try {
+                    caps = info.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC);
+                } catch (IllegalArgumentException e) {
+                    continue;
+                }
+                MediaCodecInfo.VideoCapabilities vc = caps.getVideoCapabilities();
+                if (vc == null || !vc.areSizeAndRateSupported(w, h, fps)) continue;
+                boolean main10 = false;
+                for (MediaCodecInfo.CodecProfileLevel pl : caps.profileLevels) {
+                    if (pl.profile == MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10) main10 = true;
+                }
+                if (tenBit && !main10) continue;
+                return new int[] {w, h, vc.getBitrateRange().getUpper()};
+            }
+        }
+        return null;
+    }
+
     static final class Params {
         int width, height, fps, bitrate;
         boolean tenBit;           // HEVC Main10 when true, otherwise 8-bit HEVC
@@ -220,7 +249,7 @@ final class AvRecorder {
         return true;
     }
 
-    private static void copyPlane(ByteBuffer src, int rowBytes, int rows, ByteBuffer dst, int dstStride) {
+    static void copyPlane(ByteBuffer src, int rowBytes, int rows, ByteBuffer dst, int dstStride) {
         int dstBase = dst.position();
         for (int r = 0; r < rows; r++) {
             int dstPos = dstBase + r * dstStride;

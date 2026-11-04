@@ -29,6 +29,7 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
     }
 
     static final class Stats {
+        long frames;
         long dropped;
         long written;
         float msPerFrame;
@@ -77,7 +78,7 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
     private int shadingAge;
 
     private AvRecorder recorder;
-    private long dropped, lastTs;
+    private long frames, dropped, lastTs;
     private float avgMs;
     private long lastStatsAt;
 
@@ -96,7 +97,7 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
         handler.post(() -> {
             try {
                 setup = s;
-                egl = new EglCore(!s.encoder.p010Input);
+                egl = new EglCore(s.encoder != null && !s.encoder.p010Input);
                 previewSurface = egl.createWindow(preview);
                 egl.makeCurrent(previewSurface);
                 egl.disableVsync();
@@ -200,12 +201,14 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
         proc.drawPreview(egl.width(previewSurface), egl.height(previewSurface), view);
         egl.swap(previewSurface);
 
+        frames++;
         float ms = (SystemClock.elapsedRealtimeNanos() - started) / 1e6f;
         avgMs = avgMs == 0 ? ms : avgMs * 0.95f + ms * 0.05f;
         long now = SystemClock.elapsedRealtime();
         if (now - lastStatsAt > 500) {
             lastStatsAt = now;
             Stats s = new Stats();
+            s.frames = frames;
             s.dropped = dropped;
             s.msPerFrame = avgMs;
             s.cct = appliedCct;

@@ -784,6 +784,8 @@ public class MainActivity extends Activity implements CameraController.Listener 
     }
 
     @Override public void onLogStats(LogEngine.Stats s) {
+        android.util.Log.i("TrueLog", "log frames=" + s.frames + " ms=" + s.msPerFrame + " cct=" + s.cct
+                + " shadingMissing=" + s.shadingMissing);
         main.post(() -> statsLine = String.format(Locale.US, "%.0fms/f  %.0fK%s%s",
                 s.msPerFrame, s.cct,
                 s.recording ? "  drop " + s.dropped : "",
