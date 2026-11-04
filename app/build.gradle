@@ -1,0 +1,29 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'app.truelog.camera'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'app.truelog.camera'
+        minSdk 33
+        targetSdk 35
+        versionCode Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+        versionName "0.1.${System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
+        testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+    }
+    signingConfigs {
+        sideload {
+            storeFile file('sideload.keystore')
+            storePassword 'truelog-sideload'
+            keyAlias 'truelog'
+            keyPassword 'truelog-sideload'
+        }
+    }
+    buildTypes {
+        debug { signingConfig signingConfigs.sideload }
+        release { signingConfig signingConfigs.sideload; minifyEnabled false }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    lint { abortOnError false }
+}
+dependencies { testImplementation 'junit:junit:4.13.2' }
