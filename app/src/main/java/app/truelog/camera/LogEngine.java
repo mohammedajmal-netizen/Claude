@@ -167,7 +167,10 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
 
     private void processFrame(Image img, FrameMeta m) {
         long started = SystemClock.elapsedRealtimeNanos();
+        boolean trace = frames < 3;
+        if (trace) Log.i(TAG, "frame " + frames + " start");
         applyColor(m);
+        if (trace) Log.i(TAG, "frame " + frames + " colour done, gains " + java.util.Arrays.toString(params.gainsRgb));
         params.black = m.black;
         params.white = m.white;
 
@@ -179,6 +182,11 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
 
         Image.Plane plane = img.getPlanes()[0];
         proc.process(plane.getBuffer(), plane.getRowStride(), params);
+        if (trace) {
+            android.opengl.GLES20.glFinish();
+            Log.i(TAG, "frame " + frames + " RAW to Log done at "
+                    + (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000 + " ms");
+        }
 
         long ts = img.getTimestamp();
         AvRecorder rec = recorder;
@@ -206,6 +214,7 @@ final class LogEngine implements ImageReader.OnImageAvailableListener {
         view.zebra = settings.zebra;
         view.peaking = settings.peaking;
         proc.drawPreview(egl.width(previewSurface), egl.height(previewSurface), view);
+        if (trace) Log.i(TAG, "frame " + frames + " preview drawn");
         egl.swap(previewSurface);
 
         if (frames++ == 0) {

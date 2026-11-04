@@ -7,6 +7,7 @@ pass() { echo "CHECK OK: $1"; }
 
 ./gradlew --no-daemon connectedDebugAndroidTest || fail "instrumented tests"
 python3 .github/scripts/gpu-test-summary.py
+adb logcat -d | grep TrueLogPerf | tail -3
 
 ./gradlew --no-daemon assembleDebug
 adb install -r -g app/build/outputs/apk/debug/app-debug.apk
@@ -56,6 +57,9 @@ done
 sleep 10
 adb exec-out screencap -p > emulator-log.png || true
 alive "LOG mode opens without crashing"
+echo "=== Log thread stack ==="
+adb shell debuggerd -j "$(adb shell pidof app.truelog.camera | tr -d '\r')" > stacks.txt 2>&1 || true
+python3 .github/scripts/print-thread.py stacks.txt log-gl
 frames=$(adb logcat -d | grep "TrueLog.*log frames=" | tail -1)
 echo "LOG STATS $frames"
 [ -n "$frames" ] && pass "real camera RAW reached the Log pipeline" || fail "no RAW frames reached the Log pipeline"

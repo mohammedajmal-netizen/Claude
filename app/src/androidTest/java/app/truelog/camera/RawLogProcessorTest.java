@@ -184,6 +184,34 @@ public class RawLogProcessorTest {
         p.release();
     }
 
+    @Test public void fullSizeFrameFinishes() {
+        RawLogProcessor.Config c = new RawLogProcessor.Config();
+        c.rawWidth = 1856;
+        c.rawHeight = 1392;
+        c.cropX = 0;
+        c.cropY = 176;
+        c.cropWidth = 1856;
+        c.cropHeight = 1040;
+        c.outWidth = 1856;
+        c.outHeight = 1040;
+        c.cfa = 0;
+        RawLogProcessor p = new RawLogProcessor(c);
+        RawLogProcessor.Params params = new RawLogProcessor.Params();
+        params.black = new float[] {64, 64, 64, 64};
+        params.white = 1023;
+        ByteBuffer raw = frame(c, new double[] {0.09, 0.09, 0.09}, c.rawWidth, 64, 1023);
+        long t0 = android.os.SystemClock.elapsedRealtime();
+        p.process(raw, c.rawWidth * 2, params);
+        android.opengl.GLES20.glFinish();
+        long t1 = android.os.SystemClock.elapsedRealtime();
+        int[] got = sampleCentre(p);
+        long t2 = android.os.SystemClock.elapsedRealtime();
+        android.util.Log.i("TrueLogPerf", "process " + (t1 - t0) + " ms, P010 " + (t2 - t1) + " ms, centre Y " + got[0]);
+        System.out.println("PERF process " + (t1 - t0) + " ms, P010 " + (t2 - t1) + " ms");
+        assertCodes("full size", new int[] {420, 512, 512}, got, 2);
+        p.release();
+    }
+
     @Test public void sensorClipStaysNeutral() {
         RawLogProcessor.Config c = config(0);
         RawLogProcessor p = new RawLogProcessor(c);

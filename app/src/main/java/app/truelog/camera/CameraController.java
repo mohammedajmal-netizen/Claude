@@ -24,6 +24,7 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ExifInterface;
 import android.media.Image;
 import android.media.ImageReader;
+import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.net.Uri;
 import android.os.Handler;
@@ -749,11 +750,13 @@ final class CameraController implements LogEngine.Listener {
         boolean hlg = settings.hlg && hlgSupported();
         // HLG is 10-bit and so needs HEVC. Otherwise fall back to the other codec if one is missing.
         String mime = settings.h264 && !hlg ? MediaFormat.MIMETYPE_VIDEO_AVC : MediaFormat.MIMETYPE_VIDEO_HEVC;
-        int[] fit = AvRecorder.fitVideo(mime, settings.videoHeight, settings.videoFps, hlg);
+        Size[] cameraSizes = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                .getOutputSizes(MediaCodec.class);
+        int[] fit = AvRecorder.fitVideo(mime, settings.videoHeight, settings.videoFps, hlg, cameraSizes);
         if (fit == null && !hlg) {
             mime = mime.equals(MediaFormat.MIMETYPE_VIDEO_AVC)
                     ? MediaFormat.MIMETYPE_VIDEO_HEVC : MediaFormat.MIMETYPE_VIDEO_AVC;
-            fit = AvRecorder.fitVideo(mime, settings.videoHeight, settings.videoFps, false);
+            fit = AvRecorder.fitVideo(mime, settings.videoHeight, settings.videoFps, false, cameraSizes);
         }
         if (fit == null) {
             throw new IllegalStateException("no encoder for " + settings.videoFps + " fps"

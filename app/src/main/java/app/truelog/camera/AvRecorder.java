@@ -78,10 +78,15 @@ final class AvRecorder {
      * Largest 16:9 size at or below the request that an encoder for this codec can deliver.
      * Returns {width, height, maxBitrate}, or null when nothing fits.
      */
-    static int[] fitVideo(String mime, int height, int fps, boolean tenBit) {
+    static int[] fitVideo(String mime, int height, int fps, boolean tenBit, android.util.Size[] cameraSizes) {
         for (int h : new int[] {height, 2160, 1080, 720, 480}) {
             if (h > height) continue;
             int w = (h * 16 / 9 + 1) & ~1;
+            boolean cameraCan = false;
+            for (android.util.Size s : cameraSizes) {
+                if (s.getWidth() == w && s.getHeight() == h) cameraCan = true;
+            }
+            if (!cameraCan) continue;
             for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
                 if (!info.isEncoder()) continue;
                 MediaCodecInfo.CodecCapabilities caps;
