@@ -15,6 +15,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Compile, unit test, package
         run: ./gradlew --no-daemon testReleaseUnitTest assembleRelease
+      - name: Run the real shaders on a software GPU
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libegl1 libegl-mesa0 libgl1-mesa-dri libgl1 libglx-mesa0
+          pip install -q moderngl numpy
+          python3 tools/shader_test.py
       - uses: actions/upload-artifact@v4
         with:
           name: TrueLog-apk
@@ -40,7 +46,7 @@ jobs:
           arch: x86_64
           target: google_apis
           force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front emulated
+          emulator-options: -no-window -gpu swangle_indirect -feature GLESDynamicVersion -noaudio -no-boot-anim -camera-back emulated -camera-front emulated
           disable-animations: true
           script: bash .github/scripts/emulator-checks.sh
       - name: Upload test reports
@@ -52,3 +58,4 @@ jobs:
             app/build/reports/androidTests/**
             emulator-logcat.txt
             emulator-*.png
+            ui.xml

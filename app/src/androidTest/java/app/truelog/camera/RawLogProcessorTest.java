@@ -2,6 +2,7 @@ package app.truelog.camera;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
@@ -24,12 +25,17 @@ public class RawLogProcessorTest {
     private static final int W = 64, H = 36;
     private EglCore egl;
 
+    /** The emulator may only offer ES 3.0. tools/shader_test.py covers the shaders in that case. */
     @Before public void setUp() {
-        egl = new EglCore(false);
+        try {
+            egl = new EglCore(false);
+        } catch (IllegalStateException e) {
+            assumeTrue(e.getMessage(), false);
+        }
     }
 
     @After public void tearDown() {
-        egl.release();
+        if (egl != null) egl.release();
     }
 
     private static RawLogProcessor.Config config(int cfa) {

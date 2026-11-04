@@ -11,7 +11,7 @@ final class Shaders {
         precision highp int;
         precision highp sampler2D;
         precision highp usampler2D;
-        layout(local_size_x = 64, local_size_y = 64) in;
+        layout(local_size_x = 8, local_size_y = 8) in;
         layout(binding = 0) uniform usampler2D uRaw;
         layout(binding = 1) uniform sampler2D uShade;
         layout(r32f, binding = 0) writeonly uniform highp image2D uOut;
@@ -45,7 +45,7 @@ final class Shaders {
         precision highp float;
         precision highp int;
         precision highp sampler2D;
-        layout(local_size_x = 64, local_size_y = 64) in;
+        layout(local_size_x = 8, local_size_y = 8) in;
         layout(binding = 0) uniform sampler2D uLin;
         layout(rgba16f, binding = 0) writeonly uniform highp image2D uOut;
         uniform ivec2 uRedPos;
@@ -98,7 +98,7 @@ final class Shaders {
         precision highp float;
         precision highp int;
         precision highp sampler2D;
-        layout(local_size_x = 32, local_size_y = 32) in;
+        layout(local_size_x = 8, local_size_y = 8) in;
         layout(binding = 0) uniform sampler2D uLog;
         layout(std430, binding = 0) writeonly buffer YPlane { uint y[]; };
         layout(std430, binding = 1) writeonly buffer UvPlane { uint uv[]; };

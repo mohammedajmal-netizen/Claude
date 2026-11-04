@@ -87,6 +87,7 @@ final class CameraController implements LogEngine.Listener {
     private AvRecorder recorder;
     private MediaSaver.PendingVideo pendingVideo;
     private boolean recording;
+    private boolean starting;
 
     private int lastIso = 100;
     private long lastExposure = 10_000_000L;
@@ -317,6 +318,7 @@ final class CameraController implements LogEngine.Listener {
                     if (recorder != null) recorder.start();
                     s.setRepeatingRequest(repeating.build(), resultCallback, handler);
                     if (recorder != null) {
+                        starting = false;
                         recording = true;
                         listener.onRecordingChanged(true);
                     }
@@ -326,10 +328,18 @@ final class CameraController implements LogEngine.Listener {
                 }
             }
             @Override public void onConfigureFailed(CameraCaptureSession s) {
-                if (gen == generation) {
-                    listener.onCameraError(mode == Mode.LOG
-                            ? "This lens refused a RAW video stream"
-                            : "The camera refused this combination of settings");
+                if (gen != generation) return;
+                boolean wasStartingVideo = recorder != null;
+                if (wasStartingVideo) dropFailedRecorder();
+                listener.onCameraError(mode == Mode.LOG
+                        ? "This lens refused a RAW video stream"
+                        : "The camera refused this combination of settings");
+                if (wasStartingVideo) {
+                    try {
+                        configureSession(gen);
+                    } catch (CameraAccessException | IOException | RuntimeException e) {
+                        listener.onCameraError("Could not resume preview: " + e.getMessage());
+                    }
                 }
             }
         });
@@ -684,11 +694,14 @@ final class CameraController implements LogEngine.Listener {
     }
 
     private void startRecordingInternal() {
-        if (session == null) return;
+        if (session == null || starting) return;
+        starting = true;
         try {
             if (settings.mode == Mode.LOG) startLogRecording();
             else if (settings.mode == Mode.VIDEO) startVideoRecording();
         } catch (IOException | CameraAccessException | RuntimeException e) {
+            starting = false;
+            abandonPendingVideo();
             listener.onCameraError("Could not start recording: " + e.getMessage());
         }
     }
@@ -713,6 +726,7 @@ final class CameraController implements LogEngine.Listener {
         repeating.set(CaptureRequest.CONTROL_AWB_LOCK, true);
         applyChanges();
         engine.startRecording(p, pendingVideo.fd.getFileDescriptor(), () -> handler.post(() -> {
+            starting = false;
             recording = true;
             listener.onRecordingChanged(true);
             listener.onNotice(enc.describe());
@@ -736,6 +750,22 @@ final class CameraController implements LogEngine.Listener {
         recorder = new AvRecorder(p, pendingVideo.fd.getFileDescriptor());
         recorder.setClockOffsetNs(clockOffsetNs());
         configureSession(generation);
+    }
+
+    /** The encoder never received a frame, so its file is empty and can go. */
+    private void dropFailedRecorder() {
+        AvRecorder r = recorder;
+        recorder = null;
+        starting = false;
+        r.discard();
+        abandonPendingVideo();
+    }
+
+    private void abandonPendingVideo() {
+        if (pendingVideo != null) {
+            MediaSaver.finishVideo(context, pendingVideo, false);
+            pendingVideo = null;
+        }
     }
 
     private void stopRecordingInternal() {
@@ -835,6 +865,12 @@ final class CameraController implements LogEngine.Listener {
     }
 
     @Override public void onLogError(String message) {
+        handler.post(() -> {
+            if (starting) {
+                starting = false;
+                abandonPendingVideo();
+            }
+        });
         listener.onCameraError(message);
     }
 }

@@ -108,6 +108,7 @@ public class MainActivity extends Activity implements CameraController.Listener 
         rebuildLensRail();
         rebuildModeRail();
         rebuildControls();
+        for (String line : DeviceReport.build(lenses).split("\n")) android.util.Log.i("TrueLog", line);
 
         orientationListener = new OrientationEventListener(this) {
             @Override public void onOrientationChanged(int o) {
@@ -754,6 +755,7 @@ public class MainActivity extends Activity implements CameraController.Listener 
     }
 
     @Override public void onCameraError(String message) {
+        android.util.Log.e("TrueLog", message);
         main.post(() -> {
             showNotice(message);
             summary = message;
@@ -762,6 +764,7 @@ public class MainActivity extends Activity implements CameraController.Listener 
     }
 
     @Override public void onSaved(Uri uri, String what) {
+        android.util.Log.i("TrueLog", what + " " + uri);
         main.post(() -> showNotice(what));
     }
 

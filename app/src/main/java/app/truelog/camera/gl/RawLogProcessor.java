@@ -187,7 +187,7 @@ public final class RawLogProcessor {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, shadeTexCurrent());
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES31.glBindImageTexture(0, linTex, 0, false, 0, GLES31.GL_WRITE_ONLY, GLES30.GL_R32F);
-        dispatch(cfg.cropWidth, cfg.cropHeight, 64);
+        dispatch(cfg.cropWidth, cfg.cropHeight);
         GLES31.glMemoryBarrier(GLES31.GL_TEXTURE_FETCH_BARRIER_BIT | GLES31.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         GLES20.glUseProgram(demosaicProg);
@@ -197,7 +197,7 @@ public final class RawLogProcessor {
         GLES20.glUniformMatrix3fv(loc(demosaicProg, "uCamToGamut"), 1, true, p.camToGamut, 0);
         GLES20.glUniform1f(loc(demosaicProg, "uExposure"), p.exposure);
         GLES31.glBindImageTexture(0, logTex, 0, false, 0, GLES31.GL_WRITE_ONLY, GLES30.GL_RGBA16F);
-        dispatch(cfg.cropWidth, cfg.cropHeight, 64);
+        dispatch(cfg.cropWidth, cfg.cropHeight);
         GLES31.glMemoryBarrier(GLES31.GL_TEXTURE_FETCH_BARRIER_BIT);
         check("process");
     }
@@ -206,7 +206,9 @@ public final class RawLogProcessor {
         return GLES20.glGetUniformLocation(program, name);
     }
 
-    private static void dispatch(int w, int h, int group) {
+    /** Group size matches local_size in the shaders. 8x8 sits inside the limit the spec guarantees. */
+    private static void dispatch(int w, int h) {
+        int group = 8;
         GLES31.glDispatchCompute((w + group - 1) / group, (h + group - 1) / group, 1);
     }
 
@@ -218,7 +220,7 @@ public final class RawLogProcessor {
         GLES20.glUniform2i(loc(p010Prog, "uOutSize"), cfg.outWidth, cfg.outHeight);
         GLES30.glBindBufferBase(GLES31.GL_SHADER_STORAGE_BUFFER, 0, ySsbo);
         GLES30.glBindBufferBase(GLES31.GL_SHADER_STORAGE_BUFFER, 1, uvSsbo);
-        dispatch(cfg.outWidth / 2, cfg.outHeight / 2, 32);
+        dispatch(cfg.outWidth / 2, cfg.outHeight / 2);
         GLES31.glMemoryBarrier(GLES31.GL_BUFFER_UPDATE_BARRIER_BIT);
         GLES20.glFinish();
 

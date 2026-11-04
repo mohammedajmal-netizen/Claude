@@ -41,6 +41,7 @@ public final class EglCore {
         GLES30.glGetIntegerv(GLES30.GL_MAJOR_VERSION, major, 0);
         GLES30.glGetIntegerv(GLES30.GL_MINOR_VERSION, minor, 0);
         if (major[0] < 3 || (major[0] == 3 && minor[0] < 1)) {
+            release();
             throw new IllegalStateException("OpenGL ES 3.1 is required, found " + major[0] + "." + minor[0]);
         }
     }

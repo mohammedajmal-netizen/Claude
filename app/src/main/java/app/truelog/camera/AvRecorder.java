@@ -376,6 +376,17 @@ final class AvRecorder {
         }
     }
 
+    /** Releases everything for a recorder that was never started. */
+    void discard() {
+        try {
+            video.release();
+            if (inputSurface != null) inputSurface.release();
+            muxer.release();
+        } catch (RuntimeException ignored) {
+            // A muxer that never started can complain on release, and the file is deleted anyway.
+        }
+    }
+
     /** Finishes the file. Returns an error message, or null on success. */
     String stop() {
         videoEosSent.set(true);

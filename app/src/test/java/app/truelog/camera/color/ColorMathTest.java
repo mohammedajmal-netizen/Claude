@@ -44,8 +44,9 @@ public class ColorMathTest {
         s.xyzToCam2 = new double[] {0.9, -0.3, -0.05, -0.35, 1.2, 0.15, -0.05, 0.2, 0.55};
         s.xyzToCam1 = new double[] {1.1, -0.4, -0.02, -0.4, 1.3, 0.08, -0.02, 0.12, 0.75};
         if (withForward) {
-            s.forward1 = new double[] {0.62, 0.21, 0.13, 0.28, 0.82, -0.10, 0.03, -0.14, 0.93};
-            s.forward2 = new double[] {0.58, 0.26, 0.12, 0.25, 0.86, -0.11, 0.02, -0.11, 0.91};
+            // Each row sums to the D50 white point, as a real forward matrix must.
+            s.forward1 = new double[] {0.62, 0.21, 0.1342, 0.28, 0.82, -0.10, 0.03, -0.14, 0.9349};
+            s.forward2 = new double[] {0.58, 0.26, 0.1242, 0.25, 0.86, -0.11, 0.02, -0.11, 0.9149};
         }
         return s;
     }
